@@ -23,21 +23,21 @@ AORI_MONKU = ["今日は草生やしてないっすけど良いんすか？ｗ�
   "今日は生えてないな。お前の頭のように。",
   "草生えないのが許されるのは小学生までだよね〜ｗｗｗｗ",
   "えっ...あなたのContribution Log, もしかして禿げすぎ？"]
+AORI_REF_TIME = hour: 4
 
 module.exports = (robot) ->
 
   new cron('0 0 22 * * *', () ->
-    dateFrom = moment().startOf('day')
-    dateTo = moment().endOf('day')
+    referenceDate = getAoriReferenceDate(moment())
+
     for user, value of GITHUB_USERS
-      checkUserCommits(user)
+      checkUserCommits(user, referenceDate.dateFrom, referenceDate.dateTo)
   ).start()
 
   robot.respond /github checkCommits (.*)/i, (msg) ->
     user = msg.match[1]
-    dateFrom = moment().startOf('day')
-    dateTo = moment().endOf('day')
-    checkUserCommits(user, dateFrom, dateTo)
+    referenceDate = getAoriReferenceDate(moment())
+    checkUserCommits(user, referenceDate.dateFrom, referenceDate.dateTo)
 
   # 指定された期間内にコミットイベント（プッシュイベントがない場合は煽る）
   checkUserCommits = (user, dateFrom, dateTo) ->
@@ -53,7 +53,7 @@ module.exports = (robot) ->
         unless event.type == "PushEvent"
           continue
         createAt = moment(event.created_at)
-        unless dateFrom.IsAfter(createAt) and dateTo.IsBefore(createAt)
+        unless existsBetweenRefDateRange(createAt, dateFrom, dateTo)
           continue
         commitCount++
       if commitCount > 0
@@ -64,5 +64,18 @@ module.exports = (robot) ->
       robot.logger.debug GITHUB_USERS[user]
       message = "#{GITHUB_USERS[user]}\n#{message}"
       robot.send TARGET_ROOM, message
+
+  existsBetweenRefDateRange =(createAt, referenceDateFrom, referenceDateTo) ->
+    return referenceDateFrom.isBefore(createAt) and referenceDateTo.isAfter(createAt)
+
+  getAoriReferenceDate = (checkingDate, configuredReferenceTime = AORI_REF_TIME) ->
+    if checkingDate.isAfter(moment(configuredReferenceTime))
+      return referenceDate =
+        dateFrom : moment(configuredReferenceTime)
+        dateTo : moment(configuredReferenceTime).add(1, 'days')
+    else
+      return referenceDate =
+        dateFrom : moment(configuredReferenceTime).subtract(1, 'days')
+        dateTo : moment(configuredReferenceTime)
 
   random = (n) -> Math.floor(Math.random() * n)
