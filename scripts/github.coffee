@@ -7,10 +7,25 @@ cron = require('cron').CronJob
 moment = require('moment-timezone')
 moment.tz.setDefault("Asia/Tokyo")
 
+SLACK_USERS = {
+  "Niwa.Takeru": 
+    id: "U7Z8HE0RY"
+    gitHub: "tkrplus"
+    realName: "Niwa.Takeru"
+  "Mogi.Wataru":
+    id: "U7Z9XNP2Q"
+    gitHub: "wtrmgmg"
+    realName: "Mogi.Wataru"
+  "Masutani.Yuichi":
+    id: "U7YJRB5HN"
+    gitHub: "r-manase"
+    realName: "Masutani.Yuichi"
+}
+
 GITHUB_USERS =
-  "tkrplus":"@Niwa.Takeru"
-  "wtrmgmg":"@Mogi.Wataru"
-  "r-manase":"@Masutani.Yuichi"
+  "tkrplus":SLACK_USERS["Niwa.Takeru"]
+  "wtrmgmg":SLACK_USERS["Mogi.Wataru"]
+  "r-manase":SLACK_USERS["Masutani.Yuichi"]
 
 GITHUB_USERNAME = "mmncloud"
 GITHUB_BASE_URL = "https://api.github.com"
@@ -54,6 +69,9 @@ module.exports = (robot) ->
   robot.hear /^@ぷるりく|@プルリク (.*)/i, (msg) ->
     checkRepositoryPullRequests msg.envelope.room, GITHUB_USERNAME, msg.match[1]
 
+  robot.hear /test (.*)/i, (msg) ->
+    msg.send getSlackMentionByName msg.match[1]
+
   # 指定された期間内にコミットイベント（プッシュイベントがない場合は煽る）
   checkUserCommits = (user, dateFrom, dateTo) ->
     request = robot.http(getGitHubApiURL "/users/#{user}/events")
@@ -74,10 +92,8 @@ module.exports = (robot) ->
       if commitCount > 0
         return
       message = AORI_MONKU[random(AORI_MONKU.length)]
-      robot.logger.debug user
-      robot.logger.debug GITHUB_USERS
-      robot.logger.debug GITHUB_USERS[user]
-      message = "#{getSlackUserByGitHubUser(user)}\n#{message}"
+      slackUser = getSlackUserByGitHubUser user
+      message = "#{getSlackMentionByUser(slackUser)}\n#{message}"
       robot.send TARGET_ROOM, message
 
   existsBetweenRefDateRange =(createAt, referenceDateFrom, referenceDateTo) ->
@@ -97,6 +113,9 @@ module.exports = (robot) ->
 
   getSlackUserByGitHubUser = (gitHubUser) ->
     return GITHUB_USERS[gitHubUser]
+
+  getSlackMentionByUser = (user) ->
+    return "<@#{user.id}>"
 
   getRoomByName = (name) ->
     channel = robot.adapter.client.rtm.dataStore.getChannelOrGroupByName name
@@ -123,10 +142,10 @@ module.exports = (robot) ->
         reviewee = getSlackUserByGitHubUser(pullRequest.user.login)
         reviewerList = []
         for reviewer, i in pullRequest.requested_reviewers
-          name = getSlackUserByGitHubUser(reviewer.login)
-          unless name
+          user = getSlackUserByGitHubUser(reviewer.login)
+          unless user
             return
-          reviewerList.push name
+          reviewerList.push user.realName
         reviewerUsers = reviewerList.join ' '
         daysAgo = moment().diff(moment(pullRequest.created_at), 'days')
         overview = pullRequest.body.split('\r\n')[1]
@@ -136,7 +155,7 @@ module.exports = (robot) ->
           title_link: pullRequest.html_url
           fields:[
               title: "Reviewee"
-              value: reviewee
+              value: reviewee.realName
               short: true
             ,
               title: "Reviewer"
