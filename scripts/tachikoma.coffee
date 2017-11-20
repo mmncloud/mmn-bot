@@ -43,5 +43,5 @@ TACHIKOMA_WORDS = [
 
 module.exports = (robot) ->
 
-	robot.hear /[たちこま|タチコマ/tachikoma]/i, (msg) -> 
+	robot.hear /たちこま|タチコマ|tachikoma/i, (msg) -> 
 		msg.send msg.random TACHIKOMA_WORDS
